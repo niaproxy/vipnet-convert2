@@ -473,7 +473,7 @@ def convert_config():
 Button(
     window,
     text='КОНВЕРТИРОВАТЬ',
-    command=convert_config
+    command=demo_mode
 ).pack(expand=True)
 window.bind("<Button-3>", do_popup)
 window.mainloop()
