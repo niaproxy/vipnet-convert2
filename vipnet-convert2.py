@@ -50,6 +50,21 @@ asa_box.config(yscrollcommand=sb.set)
 #sb.config(command=asa_box.yview)
 sb.config(command=vipnet_box.yview)
 frame.pack(expand=True)
+runcount=0
+Keyword="15920951887333659761"
+def demo_mode():
+    global runcount
+    if runcount == 0:
+        onetimekey=str(random.getrandbits(16))
+        hash=onetimekey+str(Keyword)
+        trial_key_true = hashlib.md5(hash.encode())
+        trial_key = simpledialog.askstring('','Для получения пробного ключа отправьте код:\n                                    %s\n на адрес samohin-iv@utg.gazprom.ru' % onetimekey)
+        if trial_key == trial_key_true.hexdigest():
+            runcount = 1
+    if runcount <= 3 and runcount != 0:
+        convert_config()
+    else:
+        messagebox.showerror('', 'Количество пробных запросов превышено.\nЗапросите новый ключ.')
 #Offical ASA ports
 #https://www.cisco.com/c/en/us/td/docs/security/asa/asa96/configuration/general/asa-96-general-config/ref-ports.html#ID-2120-000002b8
 def change_asa_service(port):
@@ -272,6 +287,8 @@ def parse_accesslist(id,lst,nets):
 
 
 def convert_config():
+    global runcount
+    runcount += 1
     nets={}
     net=[]
     service_objects={}
