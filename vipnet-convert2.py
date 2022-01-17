@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 #-*- coding: utf-8 -*-
-
+import socket
 from tkinter import *  
 #import tkFileDialog as filedialog
 from tkinter import messagebox
@@ -9,7 +9,7 @@ from netaddr import IPAddress
 
 window = Tk()  
 window.title("Конвертация конфига")  
-window.geometry('1100x980')    
+window.geometry('1100x940')    
 frame = Frame(window)
 header = Label(frame, text="Исходный конфиг ASA                                                  Конфиг VipNet", font=("Arial Bold", 14), padx=15, pady=15)
 header.pack( side = TOP)
@@ -38,6 +38,12 @@ def copy_text():
    window.clipboard_append(vipnet_box.get('1.0', 'end'))
    window.update()
 
+def valid_ip(address):
+    try: 
+        socket.inet_aton(address)
+        return True
+    except:
+        return False
 
 sb = Scrollbar(frame)
 sb.pack(side=RIGHT, fill=BOTH)
@@ -211,6 +217,8 @@ def do_popup(event):
         m.grab_release()
 def parse_accesslist(id,lst,nets):
      try:
+      #print(lst[5+2])
+      #print(nets)
      #id=5
       if lst[id] == "object-group":
         source =','.join(map(str,nets.get(lst[id+1])))
@@ -219,11 +227,16 @@ def parse_accesslist(id,lst,nets):
         elif lst[id+2] == "object":
           destination = "@%s" % lst[id+3]
         else:
-          mask = str(IPAddress(lst[id+3]).netmask_bits())
-          if lst[id+2] == "host":
-             destination = lst[id+3] + "/" + mask
-          else:
-             destination = lst[id+2] + "/" + mask
+            if lst[id+2] == "any4":
+              destination = "@ANY"
+            elif lst[id+2] == "any":
+              destination = "@ANY"
+            else:
+              mask = str(IPAddress(lst[id+3]).netmask_bits())
+              if lst[id+2] == "host":
+                 destination = lst[id+3] + "/" + mask
+              else:
+                 destination = lst[id+2] + "/" + mask
       elif lst[id] == "object":
         source = "@%s" % lst[id+1]
         if lst[id+2] == "object-group":
@@ -231,11 +244,16 @@ def parse_accesslist(id,lst,nets):
         elif lst[id+2] == "object":
           destination = "@%s" % lst[id+3]
         else:
-          mask = str(IPAddress(lst[id+3]).netmask_bits())
-          if lst[id+2] == "host":
-             destination = lst[id+3] + "/" + mask
+          if lst[id+2] == "any4":
+            destination = "@ANY"
+          elif lst[id+2] == "any":
+            destination = "@ANY"
           else:
-             destination = lst[id+2] + "/" + mask
+           mask = str(IPAddress(lst[id+3]).netmask_bits())
+           if lst[id+2] == "host":
+            destination = lst[id+3] + "/" + mask
+           else:
+            destination = lst[id+2] + "/" + mask
       else:
         if lst[id] == "any4":
             source = "@ANY"
@@ -259,11 +277,12 @@ def parse_accesslist(id,lst,nets):
             elif lst[id] == "any":
                destination = "@ANY"
             else:
-               mask = str(IPAddress(lst[id+2]).netmask_bits())
-               if lst[id+1] == "host":
-                  destination = lst[id+2] + "/" + mask
+               
+               if lst[id+2] == "host":
+                  mask = str(IPAddress(lst[id+3]).netmask_bits())
+                  destination = lst[id+3] + "/" + mask
                else:
-                  destination = lst[id+1] + "/" + mask
+                  destination = lst[id+2] + "/" + mask
       
       return source,destination
      except TypeError:
@@ -284,6 +303,8 @@ def convert_config():
 #    line = 
     for line in asa_box.get('1.0', 'end').split('\n'):
         error_trig = True
+        line=line.replace("global_access", "GLOBAL")
+        print(line)
         if ports and not re.search("port-object eq", line):
             result = "firewall service-object add name " + name + ' '.join(ports)                       
             vipnet_box.insert('end', result)
@@ -367,7 +388,13 @@ def convert_config():
            lst=line.split(' ')
            net.append("@%s" % lst[3])
            nets.update({net_name: net})
-#    print(nets)
+        if re.search("network-object ", line):
+           lst=line.split(' ')
+           if valid_ip(lst[2]):
+               mask = str(IPAddress(lst[3]).netmask_bits())
+               net.append("%s" % lst[2] + "/" + mask)
+               nets.update({net_name: net})
+#    (nets)
 #    print(nets.get("Subnet_flat_AD"))
 #        print(error_trig)
 #     except Exception:
@@ -379,17 +406,18 @@ def convert_config():
             #messagebox.showerror('', 'Обнаружено правило привязанное к интерфейсу ASA\nВ конфиг vipnet не переносится\n %s' % line)
             continue
         if re.search("extended permit esp", line):
-            messagebox.showerror('', 'Обнаружено правило esp трафика\nВ конфиг vipnet не переносится\n %s' % line)
+            messagebox.showerror('', 'Обнаружено правило esp трафика\nВ конфиг vipnet не переносится:\n %s' % line)
             continue
         if re.search("inactive", line):
             rule_name = ""
-            messagebox.showerror('', 'Обнаружено отключенное правило\nВ конфиг vipnet не переносится\n %s' % line)
+            messagebox.showerror('', 'Обнаружено отключенное правило\nВ конфиг vipnet не переносится:\n %s' % line)
             continue
-        if re.search("access-list global_access remark", line):
+        if re.search("access-list GLOBAL remark", line):
             lst=line.split('remark')
             rule_name = '"%s"' % lst[1].strip()
             
-        if re.search("access-list global_access extended", line):
+        if re.search("access-list GLOBAL extended", line):
+            print(line)
             lst=line.split(' ')
             if lst[4] == "ip":
                 service = "service @any"
@@ -460,3 +488,4 @@ Button(
 ).pack(expand=True)
 window.bind("<Button-3>", do_popup)
 window.mainloop()
+
